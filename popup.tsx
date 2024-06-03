@@ -1,26 +1,34 @@
-import { useState } from "react"
+import React, { useEffect, useState } from "react";
 
-function IndexPopup() {
-  const [data, setData] = useState("")
+const Popup = () => {
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    const queryInfo = { active: true, currentWindow: true };
+
+    chrome.tabs.query(queryInfo, (tabs) => {
+      const tab = tabs[0];
+      setUrl(tab.url);
+    });
+  }, []);
+
+  const handleRedirect = () => {
+    chrome.tabs.create({ url: "https://seller.ozon.ru/app" });
+  };
+
+  if (url.includes("https://seller.ozon.ru/app")) {
+    return (
+      <div>
+        <p>Current URL: {url}</p>
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        padding: 16
-      }}>
-      <h2>
-        Welcome to your{" "}
-        <a href="https://www.plasmo.com" target="_blank">
-          Plasmo
-        </a>{" "}
-        Extension!
-      </h2>
-      <input onChange={(e) => setData(e.target.value)} value={data} />
-      <a href="https://docs.plasmo.com" target="_blank">
-        View Docs
-      </a>
+    <div>
+      <p>Данный плагин работает только на <div onClick={handleRedirect}>этой странице</div>.</p>
     </div>
-  )
-}
+  );
+};
 
-export default IndexPopup
+export default Popup;
