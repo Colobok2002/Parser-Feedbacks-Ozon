@@ -1,6 +1,8 @@
 import axios from "axios";
+import { store } from '~store';
+import { setFeedback, setTimer } from '~feedbackSlice';
 
-let timer_count = 5;
+let interval_time: number;
 
 const checkAllProcessed = (data) => {
   return data.every(item => item.interaction_status === 'PROCESSED');
@@ -21,6 +23,7 @@ const getCookies = (): Promise<string> => {
 
 
 const getFeedback = async () => {
+  store.dispatch(setFeedback([]));
   try {
     const cookies = await getCookies();
     let allProcessed = false;
@@ -65,16 +68,60 @@ const getFeedback = async () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-
-    console.log(unprocessedReviews);
+    store.dispatch(setFeedback(unprocessedReviews));
   } catch (error) {
-    alert(error);
+    console.error(error);
   }
 };
 
+const ansverRiviev = async (review_uuid: string, text: string) => {
+  const data = {
+    "review_uuid": review_uuid,
+    "text": text,
+    "company_type": "seller",
+    "company_id": "27844"
+  }
+  try {
+    const cookies = await getCookies();
+    fetch("https://seller.ozon.ru/api/review/comment/create", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Cookie": cookies
+      },
+      body: JSON.stringify(data)
+    })
+      .then(response => {
+        if (!response.ok) {
+          alert(response.status);
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log(data);
+        alert("Ответ отправлен успешно!");
+      })
+      .catch(error => console.log(error));
+  } catch (error) {
+    console.log(error);
+  }
+}
 
+const startIntervals = () => {
+  const state = store.getState();
+  interval_time = state.feedback.interval;
+  store.dispatch(setFeedback([]));
+  setInterval(() => {
+    const state = store.getState();
+    console.log(state.feedback.timer)
+    const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
+    store.dispatch(setTimer(newTimer));
+    // if (state.feedback.timer == 1) {
+    //   getFeedback()
+    // }
+  }, 900);
 
+};
 
-setInterval(() => {
- getFeedback()
-}, timer_count * 1000);
+startIntervals();

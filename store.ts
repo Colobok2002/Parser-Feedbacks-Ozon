@@ -20,7 +20,7 @@ import feedbackSlice from "~feedbackSlice"
 
 // Here you can add all your reducers
 const combinedReducers = combineReducers({
-    feedbackƒ: feedbackSlice
+    feedback: feedbackSlice
 })
 
 const persistConfig = {
