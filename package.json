@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "axios": "^1.7.2",
+    "bip39": "^3.1.0",
     "plasmo": "0.86.3",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -28,11 +29,20 @@
     "host_permissions": [
       "https://*/*"
     ],
+    "name": "test -ewe",
     "permissions": [
       "cookies",
       "tabs",
       "activeTab",
       "storage"
-    ]
+    ],
+    "commands": {
+      "test": {
+        "suggested_key": {
+          "default": "Alt+S"
+        },
+        "description": "Open the extension main popup"
+      }
+    }
   }
 }
