@@ -1,35 +1,80 @@
-import { generateMnemonic } from "bip39"
+import axios from "axios";
 
-console.log(
-  "3333"
-)
+let timer_count = 5;
 
-chrome.action.onClicked.addListener(() => {
-  console.log(`action clicked: ${generateMnemonic()}`)
-})
+const checkAllProcessed = (data) => {
+  return data.every(item => item.interaction_status === 'PROCESSED');
+};
 
-/* Note if you're building for firefox or mv2 in general, chrome.action will be undefined so you have to do something like this:
-
-@see https://stackoverflow.com/questions/70216500/chrome-action-is-undefined-migrating-to-v3-manifest
-
-const handleClick = (tab) => {
-  console.log("clicked", tab.id);
-  if (!tab.id) throw new Error("tab id not found");
-  chrome.tabs.sendMessage(tab.id, {
-    name: "show-dialog"
+const getCookies = (): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    chrome.cookies.getAll({}, (cookies) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        const cookieString = cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
+        resolve(cookieString);
+      }
+    });
   });
 };
 
-if (chrome.action != undefined) {
-  chrome.action.onClicked.addListener(handleClick);
-} else {
-  chrome.browserAction.onClicked.addListener(handleClick);
-}
-*/
 
+const getFeedback = async () => {
+  try {
+    const cookies = await getCookies();
+    let allProcessed = false;
+    let pagination_last_timestamp = null;
+    let pagination_last_uuid = null;
+    let allReviews = [];
+    let unprocessedReviews = [];
 
-chrome.commands.onCommand.addListener((command) => {
-  if (command === "test") {
-    console.log(`test command: ${generateMnemonic()}`)
+    while (!allProcessed) {
+      const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cookie": cookies
+        },
+        body: JSON.stringify({
+          "with_counters": false,
+          "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+          "company_type": "seller",
+          "filter": { "interaction_status": ["ALL"] },
+          "company_id": "27844",
+          "pagination_last_timestamp": pagination_last_timestamp,
+          "pagination_last_uuid": pagination_last_uuid
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      allReviews = [...allReviews, ...data.result];
+
+      const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
+      unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+
+      if (checkAllProcessed(data.result)) {
+        allProcessed = true;
+      } else {
+        pagination_last_timestamp = data.pagination_last_timestamp;
+        pagination_last_uuid = data.pagination_last_uuid;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    console.log(unprocessedReviews);
+  } catch (error) {
+    alert(error);
   }
-})
+};
+
+
+
+
+setInterval(() => {
+ getFeedback()
+}, timer_count * 1000);

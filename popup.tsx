@@ -1,5 +1,8 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
+import { Provider } from "react-redux"
+import { PersistGate } from "@plasmohq/redux-persist/integration/react"
+import { persistor, store } from "~store"
 
 const RenderItem = ({ review, replyText, setReplyText, ansverRiviev }) => {
   return (
@@ -39,7 +42,7 @@ const Popup = () => {
     getFeedback();
     const interval = setInterval(() => {
       getFeedback();
-    }, timer_count *  1000);
+    }, timer_count * 1000);
 
     const timerInterval = setInterval(() => {
       setTimer(prev => prev > 0 ? prev - 1 : timer_count);
@@ -210,4 +213,18 @@ const Popup = () => {
   );
 };
 
-export default Popup;
+
+
+
+
+function IndexPopup() {
+  return (
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <Popup></Popup>
+      </PersistGate>
+    </Provider>
+  )
+}
+
+export default IndexPopup
