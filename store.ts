@@ -18,7 +18,6 @@ import { Storage } from "@plasmohq/storage"
 
 import feedbackSlice from "~feedbackSlice"
 
-// Here you can add all your reducers
 const combinedReducers = combineReducers({
   feedback: feedbackSlice
 })
@@ -58,8 +57,6 @@ export const store = configureStore({
 
 export const persistor = persistStore(store)
 
-// This is what makes Redux sync properly with multiple pages
-// Open your extension's options page and popup to see it in action
 new Storage().watch({
   [`persist:${persistConfig.key}`]: (change) => {
     const { oldValue, newValue } = change

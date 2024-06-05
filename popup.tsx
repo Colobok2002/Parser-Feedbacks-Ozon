@@ -34,19 +34,19 @@ const Popup = () => {
 
   const [url, setUrl] = useState("");
 
-  useEffect(() => {
-    const queryInfo = { active: true, currentWindow: true };
-    chrome.tabs.query(queryInfo, (tabs) => {
-      const tab = tabs[0];
-      setUrl(tab.url);
-    });
-  }, []);
+  // useEffect(() => {
+  //   const queryInfo = { active: true, currentWindow: true };
+  //   chrome.tabs.query(queryInfo, (tabs) => {
+  //     const tab = tabs[0];
+  //     setUrl(tab.url);
+  //   });
+  // }, []);
 
   const handleRedirect = () => {
     chrome.tabs.create({ url: "https://seller.ozon.ru/app" });
   };
 
-  if (url.includes("https://seller.ozon.ru/app")) {
+  if (url.includes("https://seller.ozon.ru/app") || 1) {
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0 }}>
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
@@ -55,7 +55,7 @@ const Popup = () => {
           ) : (
             <p style={{ fontSize: 14 }}>Выключено</p>
           )}
-          <Switch value={work} onChange={() => dispatch(setWork(!work))}></Switch>
+          <Switch value={work} onChange={() => {alert(work);dispatch(setWork(!work))}}></Switch>
         </div>
         {work && (
           <>

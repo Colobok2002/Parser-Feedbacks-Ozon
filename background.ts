@@ -4,9 +4,6 @@ import { setFeedback, setTimer } from '~feedbackSlice';
 
 let interval_time: number;
 
-persistor.subscribe(() => {
-  console.log("State changed with: ", store?.getState())
-})
 
 const checkAllProcessed = (data) => {
   return data.every(item => item.interaction_status === 'PROCESSED');
