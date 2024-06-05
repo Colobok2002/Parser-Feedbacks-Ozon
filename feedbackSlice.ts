@@ -9,7 +9,8 @@ export interface CounterState {
 }
 
 // Define the initial state
-const time = 60;
+const time = 5
+
 const initialState: CounterState = {
   feedback: 0,
   timer: time,

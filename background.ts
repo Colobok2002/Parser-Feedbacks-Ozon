@@ -21,16 +21,33 @@ const getCookies = (): Promise<string> => {
   });
 };
 
+const sendItem = async (review) => {
+  if (review.interaction_status !== "PROCESSED") {
+    const data = {
+      "prod_art": review.product.offer_id,
+      "prod_name": review.product.title,
+      "feedback_ID": review.uuid,
+      "rating": review.rating,
+      "positive": review.text.positive,
+      "negative": review.text.negative,
+      "comment": review.text.comment,
+      "market": "ozon",
+      "dateTimeFeedback": review.published_at
+    }
+
+    await axios.post("http://127.0.0.1:8001/feedbacks/add-feedbacks/", data).catch(err => { console.log(err.response.data) })
+  }
+}
+
 const getFeedback = async () => {
   try {
     const cookies = await getCookies();
-    let allProcessed = false;
     let pagination_last_timestamp = null;
     let pagination_last_uuid = null;
     let allReviews = [];
     let unprocessedReviews = [];
 
-    while (!allProcessed) {
+    while (true) {
       const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
         method: "POST",
         headers: {
@@ -41,7 +58,7 @@ const getFeedback = async () => {
           "with_counters": false,
           "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
           "company_type": "seller",
-          "filter": { "interaction_status": ["ALL"] },
+          "filter": { "interaction_status": ["NOT_VIEWED"] },
           "company_id": "27844",
           "pagination_last_timestamp": pagination_last_timestamp,
           "pagination_last_uuid": pagination_last_uuid
@@ -58,14 +75,55 @@ const getFeedback = async () => {
       const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
       unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
 
-      if (checkAllProcessed(data.result)) {
-        allProcessed = true;
-      } else {
-        pagination_last_timestamp = data.pagination_last_timestamp;
-        pagination_last_uuid = data.pagination_last_uuid;
+      pagination_last_timestamp = data.pagination_last_timestamp;
+      pagination_last_uuid = data.pagination_last_uuid;
+
+      if (!pagination_last_timestamp || !pagination_last_uuid) {
+        break;
       }
     }
+
+    while (true) {
+      const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cookie": cookies
+        },
+        body: JSON.stringify({
+          "with_counters": false,
+          "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+          "company_type": "seller",
+          "filter": { "interaction_status": ["VIEWED"] },
+          "company_id": "27844",
+          "pagination_last_timestamp": pagination_last_timestamp,
+          "pagination_last_uuid": pagination_last_uuid
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      allReviews = [...allReviews, ...data.result];
+
+      const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
+      unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+
+      pagination_last_timestamp = data.pagination_last_timestamp;
+      pagination_last_uuid = data.pagination_last_uuid;
+
+      if (!pagination_last_timestamp || !pagination_last_uuid) {
+        break;
+      }
+    }
+
     store.dispatch(setFeedback(unprocessedReviews.length));
+    unprocessedReviews.forEach((review) => {
+      sendItem(review);
+    });
+    
   } catch (error) {
     console.error(error);
   }
@@ -107,10 +165,14 @@ const ansverRiviev = async (review_uuid: string, text: string) => {
 const startIntervals = async () => {
   const state = store.getState();
   interval_time = state.feedback.interval;
-  await getFeedback()
+  const work = state.feedback.work
+  if (work) {
+    await getFeedback()
+  }
   setInterval(async () => {
     const state = store.getState();
     const work = state.feedback.work
+    console.log(work)
     if (work) {
       const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
       store.dispatch(setTimer(newTimer));
