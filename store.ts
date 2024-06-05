@@ -71,9 +71,7 @@ new Storage().watch({
         updatedKeys.push(key)
       }
     }
-    if (updatedKeys.length > 0) {
-      persistor.resync()
-    }
+    persistor.resync()
   }
 })
 

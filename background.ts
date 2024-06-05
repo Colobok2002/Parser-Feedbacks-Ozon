@@ -4,7 +4,6 @@ import { setFeedback, setTimer } from '~feedbackSlice';
 
 let interval_time: number;
 
-
 const checkAllProcessed = (data) => {
   return data.every(item => item.interaction_status === 'PROCESSED');
 };
@@ -21,7 +20,6 @@ const getCookies = (): Promise<string> => {
     });
   });
 };
-
 
 const getFeedback = async () => {
   try {
@@ -65,10 +63,9 @@ const getFeedback = async () => {
       } else {
         pagination_last_timestamp = data.pagination_last_timestamp;
         pagination_last_uuid = data.pagination_last_uuid;
-        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-    store.dispatch(setFeedback(unprocessedReviews));
+    store.dispatch(setFeedback(unprocessedReviews.length));
   } catch (error) {
     console.error(error);
   }
@@ -107,26 +104,23 @@ const ansverRiviev = async (review_uuid: string, text: string) => {
   }
 }
 
-const startIntervals = () => {
+const startIntervals = async () => {
   const state = store.getState();
   interval_time = state.feedback.interval;
-  store.dispatch(setFeedback([]));
-  setInterval(() => {
+  await getFeedback()
+  setInterval(async () => {
     const state = store.getState();
-    let work = state.feedback.work
+    const work = state.feedback.work
     if (work) {
-      console.log("work")
       const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
       store.dispatch(setTimer(newTimer));
-      if (state.feedback.timer == 1 || state.feedback.timer == interval_time) {
-        getFeedback()
+      if (newTimer === 1) {
+        await getFeedback()
       }
     } else {
       store.dispatch(setTimer(interval_time));
-      console.log("no work")
     }
   }, 900);
 };
 
 startIntervals();
-
