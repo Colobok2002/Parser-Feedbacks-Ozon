@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from 'react-redux';
 import { Provider } from "react-redux"
 import { PersistGate } from "@plasmohq/redux-persist/integration/react"
-import { persistor, store } from "./store"
-import { setTimer } from "./feedbackSlice"
+import { store, persistor, useAppDispatch, useAppSelector } from "./store"
+import { setWork } from "./feedbackSlice"
 import type { RootState } from './store';
+import { Switch } from "antd";
 
 const RenderItem = ({ review, replyText, setReplyText }) => {
   return (
@@ -20,14 +21,16 @@ const RenderItem = ({ review, replyText, setReplyText }) => {
         value={replyText[review.uuid] || ""}
         onChange={(e) => setReplyText({ ...replyText, [review.uuid]: e.target.value })}
       />
-      {/* <button onClick={() => ansverRiviev(review.uuid, replyText[review.uuid] || "")}>Ответить</button> */}
     </div>
   )
 }
 
 const Popup = () => {
-  const timer = useSelector((state: RootState) => state.feedback.timer);
-  const data = useSelector((state: RootState) => state.feedback.feedback);
+
+  const dispatch = useAppDispatch()
+  const timer = useAppSelector((state) => state.feedback.timer);
+  const data = useAppSelector((state) => state.feedback.feedback);
+  const work = useAppSelector((state) => state.feedback.work);
 
   const [url, setUrl] = useState("");
 
@@ -39,17 +42,31 @@ const Popup = () => {
     });
   }, []);
 
-
   const handleRedirect = () => {
     chrome.tabs.create({ url: "https://seller.ozon.ru/app" });
   };
 
   if (url.includes("https://seller.ozon.ru/app")) {
     return (
-      <div>
-        <p>Следующее обновление через -  {timer} секунд</p>
-        <p>Необработано отзывов -  {data.length}</p>
-      </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 0 }}>
+        <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
+          {work ? (
+            <p style={{ fontSize: 14 }}>Включено</p>
+          ) : (
+            <p style={{ fontSize: 14 }}>Выключено</p>
+          )}
+          <Switch value={work} onChange={() => dispatch(setWork(!work))}></Switch>
+        </div>
+        {work && (
+          <>
+            <p>Следующее обновление через -  {timer} секунд</p>
+            <p>Необработано отзывов -  {data.length}</p>
+            {data.map((item, index) => (
+              <div key={index}>{item}</div>
+            ))}
+          </>
+        )}
+      </div >
     );
   }
 
@@ -62,11 +79,16 @@ const Popup = () => {
 
 function IndexPopup() {
   return (
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
-        <Popup />
-      </PersistGate>
-    </Provider>
+    <div style={{ height: 300, width: 300, background: "radial-gradient(139.34% 274.47% at 106.09% 320.4%,rgba(249,17,128,.15) 0,rgba(249,17,85,0) 100%),linear-gradient(339deg,rgba(223,198,255,.64),rgba(235,236,255,.23))", margin: -20 }}>
+      <Provider store={store}>
+        <PersistGate loading={null} persistor={persistor}>
+          <div style={{ margin: 20, padding: 10 }}>
+            <h2>Feedbacks Markets</h2>
+            <Popup />
+          </div>
+        </PersistGate>
+      </Provider>
+    </div>
   )
 }
 

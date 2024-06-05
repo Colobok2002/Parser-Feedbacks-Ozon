@@ -1,35 +1,42 @@
-// feedbackSlice.js
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
+// Define the CounterState interface
 export interface CounterState {
-  feedback: [],
-  timer: number,
-  interval: number
+  feedback: any[];
+  timer: number;
+  interval: number;
+  work: boolean;
 }
 
-const time = 30
+// Define the initial state
+const time = 5;
 const initialState: CounterState = {
   feedback: [],
-  timer:  time,
-  interval:  time
-}
+  timer: time,
+  interval: time,
+  work: false,
+};
 
+// Create a slice for feedback
 const feedbackSlice = createSlice({
   name: "feedback",
   initialState,
   reducers: {
-    setFeedback: (state, action) => {
+    setFeedback: (state, action: PayloadAction<any[]>) => {
       state.feedback = action.payload;
     },
-    setTimer: (state, action) => {
+    setTimer: (state, action: PayloadAction<number>) => {
       state.timer = action.payload;
     },
-    setInterval: (state, action) => {
+    setInterval: (state, action: PayloadAction<number>) => {
       state.interval = action.payload;
-    }
-  }
-})
+    },
+    setWork: (state, action: PayloadAction<boolean>) => {
+      state.work = action.payload;
+    },
+  },
+});
 
-export const { setFeedback, setTimer, setInterval } = feedbackSlice.actions;
-
+// Export actions and reducer
+export const { setFeedback, setTimer, setInterval, setWork } = feedbackSlice.actions;
 export default feedbackSlice.reducer;

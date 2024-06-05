@@ -1,8 +1,12 @@
 import axios from "axios";
-import { store } from '~store';
+import { persistor, store } from '~store';
 import { setFeedback, setTimer } from '~feedbackSlice';
 
 let interval_time: number;
+
+persistor.subscribe(() => {
+  console.log("State changed with: ", store?.getState())
+})
 
 const checkAllProcessed = (data) => {
   return data.every(item => item.interaction_status === 'PROCESSED');
@@ -23,7 +27,6 @@ const getCookies = (): Promise<string> => {
 
 
 const getFeedback = async () => {
-  store.dispatch(setFeedback([]));
   try {
     const cookies = await getCookies();
     let allProcessed = false;
@@ -99,7 +102,6 @@ const ansverRiviev = async (review_uuid: string, text: string) => {
         return response.json();
       })
       .then(data => {
-        console.log(data);
         alert("Ответ отправлен успешно!");
       })
       .catch(error => console.log(error));
@@ -114,14 +116,20 @@ const startIntervals = () => {
   store.dispatch(setFeedback([]));
   setInterval(() => {
     const state = store.getState();
-    console.log(state.feedback.timer)
-    const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
-    store.dispatch(setTimer(newTimer));
-    // if (state.feedback.timer == 1) {
-    //   getFeedback()
-    // }
+    let work = state.feedback.work
+    if (work) {
+      console.log("work")
+      const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
+      store.dispatch(setTimer(newTimer));
+      if (state.feedback.timer == 1 || state.feedback.timer == interval_time) {
+        getFeedback()
+      }
+    } else {
+      store.dispatch(setTimer(interval_time));
+      console.log("no work")
+    }
   }, 900);
-
 };
 
 startIntervals();
+

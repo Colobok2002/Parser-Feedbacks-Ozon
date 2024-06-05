@@ -13,6 +13,7 @@
     "@plasmohq/redux-persist": "^6.1.0",
     "@plasmohq/storage": "^1.10.0",
     "@reduxjs/toolkit": "^2.2.5",
+    "antd": "^5.18.0",
     "axios": "^1.7.2",
     "bip39": "^3.1.0",
     "plasmo": "0.86.3",
