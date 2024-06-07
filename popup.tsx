@@ -3,7 +3,8 @@ import { Provider } from "react-redux";
 import { PersistGate } from "@plasmohq/redux-persist/integration/react";
 import { store, persistor, useAppDispatch, useAppSelector } from "./store";
 import { setWork } from "./feedbackSlice";
-import { Tabs, Switch, Input, Button, Form, Typography } from "antd";
+import { Tabs, Switch, Input, Button, Form, Typography, message } from "antd";
+import axios from "axios";
 
 const { TabPane } = Tabs;
 const { Text } = Typography;
@@ -17,6 +18,7 @@ const Popup = () => {
   const [url, setUrl] = useState("");
   const [apiUrl, setApiUrl] = useState("");
   const [companyId, setCompanyId] = useState("");
+  const [headerApiKey, setHeaderApiKey] = useState("");
   const [apiUrlError, setApiUrlError] = useState("");
   const [companyIdError, setCompanyIdError] = useState("");
 
@@ -27,14 +29,11 @@ const Popup = () => {
       setUrl(tab.url);
     });
 
-    const savedApiUrl = localStorage.getItem("ApiUrl");
-    const savedCompanyId = localStorage.getItem("company_id");
-    if (savedApiUrl) {
-      setApiUrl(savedApiUrl);
-    }
-    if (savedCompanyId) {
-      setCompanyId(savedCompanyId);
-    }
+    chrome.storage.local.get(["ApiUrl", "company_id", "HeaderApiKey"], (result) => {
+      if (result.ApiUrl) setApiUrl(result.ApiUrl);
+      if (result.company_id) setCompanyId(result.company_id);
+      if (result.HeaderApiKey) setHeaderApiKey(result.HeaderApiKey);
+    });
   }, []);
 
   const validateApiUrl = (url) => {
@@ -50,7 +49,7 @@ const Popup = () => {
     return /^\d+$/.test(id);
   };
 
-  const handleSaveSettings = () => {
+  const handleSaveSettings = async () => {
     let valid = true;
 
     if (!validateApiUrl(apiUrl)) {
@@ -73,9 +72,30 @@ const Popup = () => {
     }
 
     if (valid) {
-      localStorage.setItem("ApiUrl", apiUrl);
-      localStorage.setItem("company_id", companyId);
-      alert("Settings saved");
+      try {
+        const response = await axios.get(`${apiUrl}/feedbacks/chek-ozon-plagin-settings`, {
+          headers: {
+            "HeaderApiKey": headerApiKey,
+          },
+        });
+        if (response.status === 200 && response.data.status) {
+          chrome.storage.local.set({
+            ApiUrl: apiUrl,
+            company_id: companyId,
+            HeaderApiKey: headerApiKey
+          }, () => {
+            message.success("Настройки сохранены");
+          });
+        } else {
+          message.error("Ошибка при проверке настроек");
+        }
+      } catch (error) {
+        if (error.response && error.response.status === 401) {
+          message.error("Неверный токен");
+        } else {
+          message.error(`Ошибка при проверке настроек: ${error.message}`);
+        }
+      }
     }
   };
 
@@ -92,7 +112,7 @@ const Popup = () => {
               <Text>Для работы плагина необходимо авторизоваться</Text>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 10 }}>
-                {apiUrl && companyId ? (
+                {apiUrl && companyId && headerApiKey ? (
                   <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
                     <Text style={{ fontSize: 14 }}>{work ? "Включено" : "Выключено"}</Text>
                     <Switch checked={work} onChange={() => { dispatch(setWork(!work)) }} />
@@ -129,6 +149,13 @@ const Popup = () => {
               placeholder="Company ID"
               value={companyId}
               onChange={(e) => setCompanyId(e.target.value)}
+            />
+          </Form.Item>
+          <Form.Item label="Header Api Key">
+            <Input
+              placeholder="Header Api Key"
+              value={headerApiKey}
+              onChange={(e) => setHeaderApiKey(e.target.value)}
             />
           </Form.Item>
           <Form.Item>

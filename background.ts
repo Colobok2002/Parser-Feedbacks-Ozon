@@ -15,14 +15,28 @@ const getCookies = (): Promise<string> => {
   });
 };
 
-const getSettings = () => {
-  const apiUrl = localStorage.getItem("ApiUrl");
-  const companyId = localStorage.getItem("company_id");
-  return { apiUrl, companyId };
+const getSettings = (): Promise<{ apiUrl: string; companyId: string; headerApiKey: string }> => {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(["ApiUrl", "company_id", "HeaderApiKey"], (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        const apiUrl = result.ApiUrl || "";
+        const companyId = result.company_id || "";
+        const headerApiKey = result.HeaderApiKey || "";
+        resolve({
+          apiUrl,
+          companyId,
+          headerApiKey
+        });
+      }
+    });
+  });
 };
 
 const sendItemsBatch = async (reviews) => {
-  const { apiUrl } = getSettings();
+  const { apiUrl, headerApiKey } = await getSettings();
+  console.log(apiUrl)
   const data = reviews
     .filter(review => review.interaction_status !== "PROCESSED")
     .map(review => ({
@@ -40,7 +54,11 @@ const sendItemsBatch = async (reviews) => {
   if (data.length > 0) {
     try {
       console.log(data);
-      await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: data });
+      await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: data }, {
+        headers: {
+          "HeaderApiKey": headerApiKey
+        }
+      });
       console.log("Batch send successful");
     } catch (err) {
       console.log(err.response.data);
@@ -53,7 +71,8 @@ const sendItemsBatch = async (reviews) => {
 const getFeedback = async () => {
   try {
     const cookies = await getCookies();
-    const { companyId } = getSettings();
+    const { companyId } = await getSettings();
+    console.log(companyId)
     let pagination_last_timestamp = null;
     let pagination_last_uuid = null;
     let allReviews = [];
@@ -64,7 +83,7 @@ const getFeedback = async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cookie": cookies
+          "Cookie": cookies,
         },
         body: JSON.stringify({
           "with_counters": false,
@@ -100,7 +119,7 @@ const getFeedback = async () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Cookie": cookies
+          "Cookie": cookies,
         },
         body: JSON.stringify({
           "with_counters": false,
@@ -139,7 +158,7 @@ const getFeedback = async () => {
 };
 
 const ansverRiviev = async (review_uuid, text) => {
-  const { companyId } = getSettings();
+  const { companyId } = await getSettings();
   const data = {
     "review_uuid": review_uuid,
     "text": text,
@@ -152,7 +171,7 @@ const ansverRiviev = async (review_uuid, text) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Cookie": cookies
+        "Cookie": cookies,
       },
       body: JSON.stringify(data)
     });
@@ -172,13 +191,16 @@ const ansverRiviev = async (review_uuid, text) => {
   }
 };
 
-
 const updateFeedbackStatus = async (feedbackId, status) => {
-  const { apiUrl } = getSettings();
+  const { apiUrl, headerApiKey } = await getSettings();
   try {
     const response = await axios.post(`${apiUrl}/feedbacks/change-status-feedbacks`, {
       feedbackId: feedbackId,
       status: status
+    }, {
+      headers: {
+        "HeaderApiKey": headerApiKey
+      }
     });
 
     if (response.status !== 200) {
@@ -192,9 +214,13 @@ const updateFeedbackStatus = async (feedbackId, status) => {
 };
 
 const processFeedbacks = async () => {
-  const { apiUrl } = getSettings();
+  const { apiUrl, headerApiKey } = await getSettings();
   try {
-    const response = await axios.get(`${apiUrl}/feedbacks/get-feedbacks-to-markets/?market=ozon`);
+    const response = await axios.get(`${apiUrl}/feedbacks/get-feedbacks-to-markets/?market=ozon`, {
+      headers: {
+        "HeaderApiKey": headerApiKey
+      }
+    });
 
     if (response.status !== 200) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -214,7 +240,6 @@ const processFeedbacks = async () => {
     console.log('Error processing feedbacks:', error);
   }
 };
-
 
 const startIntervals = async () => {
   setInterval(async () => {
