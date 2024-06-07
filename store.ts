@@ -2,6 +2,7 @@ import { combineReducers, configureStore } from "@reduxjs/toolkit"
 import { useDispatch, useSelector } from "react-redux"
 import type { TypedUseSelectorHook } from "react-redux"
 import { syncStorage } from "redux-persist-webextension-storage"
+import { Storage } from "@plasmohq/storage"
 
 import {
   FLUSH,
@@ -14,9 +15,7 @@ import {
   REHYDRATE,
   RESYNC
 } from "@plasmohq/redux-persist"
-import { Storage } from "@plasmohq/storage"
-
-import feedbackSlice from "~feedbackSlice"
+import feedbackSlice from "./feedbackSlice"  // измените путь к вашему feedbackSlice, если необходимо
 
 const combinedReducers = combineReducers({
   feedback: feedbackSlice
@@ -28,15 +27,8 @@ const persistConfig = {
   storage: syncStorage
 }
 
-// TODO: Fix persistReducer so it doesn't break the types
 const persistedReducer = persistReducer(persistConfig, combinedReducers)
 
-// Until persistReducer is fixed, we need to use this mock store to get the types
-const mockStore = configureStore({
-  reducer: combinedReducers
-})
-
-// @ts-ignore
 export const store = configureStore({
   reducer: persistedReducer,
   middleware: (getDefaultMiddleware) =>
@@ -53,32 +45,18 @@ export const store = configureStore({
         ]
       }
     })
-}) as typeof mockStore
+})
 
 export const persistor = persistStore(store)
 
 new Storage().watch({
-  [`persist:${persistConfig.key}`]: (change) => {
-    const { oldValue, newValue } = change
-    const updatedKeys = []
-    for (const key in oldValue) {
-      if (oldValue[key] !== newValue?.[key]) {
-        updatedKeys.push(key)
-      }
-    }
-    for (const key in newValue) {
-      if (oldValue?.[key] !== newValue[key]) {
-        updatedKeys.push(key)
-      }
-    }
+  [`persist:${persistConfig.key}`]: () => {
     persistor.resync()
   }
 })
 
-// Get the types from the mock store
-export type RootState = ReturnType<typeof mockStore.getState>
-export type AppDispatch = typeof mockStore.dispatch
+export type RootState = ReturnType<typeof store.getState>
+export type AppDispatch = typeof store.dispatch
 
-// Export the hooks with the types from the mock store
 export const useAppDispatch: () => AppDispatch = useDispatch
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector

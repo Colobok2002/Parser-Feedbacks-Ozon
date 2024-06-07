@@ -7,7 +7,7 @@ export interface CounterState {
   work: boolean;
 }
 
-const time = 20
+const time = 60 * 10
 
 const initialState: CounterState = {
   feedback: 0,
