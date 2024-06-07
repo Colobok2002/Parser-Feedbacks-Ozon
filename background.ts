@@ -36,7 +36,6 @@ const getSettings = (): Promise<{ apiUrl: string; companyId: string; headerApiKe
 
 const sendItemsBatch = async (reviews) => {
   const { apiUrl, headerApiKey } = await getSettings();
-  console.log(apiUrl)
   const data = reviews
     .filter(review => review.interaction_status !== "PROCESSED")
     .map(review => ({
@@ -53,18 +52,14 @@ const sendItemsBatch = async (reviews) => {
 
   if (data.length > 0) {
     try {
-      console.log(data);
       await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: data }, {
         headers: {
           "HeaderApiKey": headerApiKey
         }
       });
-      console.log("Batch send successful");
     } catch (err) {
-      console.log(err.response.data);
     }
   } else {
-    console.log("No unprocessed reviews to send");
   }
 };
 
@@ -72,7 +67,6 @@ const getFeedback = async () => {
   try {
     const cookies = await getCookies();
     const { companyId } = await getSettings();
-    console.log(companyId)
     let pagination_last_timestamp = null;
     let pagination_last_uuid = null;
     let allReviews = [];
@@ -153,7 +147,6 @@ const getFeedback = async () => {
     store.dispatch(setFeedback(unprocessedReviews.length));
     sendItemsBatch(unprocessedReviews);
   } catch (error) {
-    console.error(error);
   }
 };
 
@@ -186,7 +179,6 @@ const ansverRiviev = async (review_uuid, text) => {
     return true;
 
   } catch (error) {
-    console.log(error);
     return false;
   }
 };
@@ -206,10 +198,7 @@ const updateFeedbackStatus = async (feedbackId, status) => {
     if (response.status !== 200) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
-    console.log(`Feedback ${feedbackId} status updated to ${status}`);
   } catch (error) {
-    console.log(`Error updating status for feedback ${feedbackId}:`, error);
   }
 };
 
@@ -233,11 +222,7 @@ const processFeedbacks = async () => {
       await updateFeedbackStatus(feedback.feedback_ID, status);
       return success;
     }));
-
-    console.log('All feedbacks processed:', results);
-
   } catch (error) {
-    console.log('Error processing feedbacks:', error);
   }
 };
 
