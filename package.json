@@ -39,6 +39,7 @@
     "name": "Feedbacks Ozon Ansver",
     "permissions": [
       "cookies",
+      "alarms",
       "tabs",
       "activeTab",
       "storage"

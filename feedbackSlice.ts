@@ -9,6 +9,8 @@ export interface CounterState {
 
 const time = 60 * 10
 
+// const time = 10
+
 const initialState: CounterState = {
   feedback: 0,
   timer: time,

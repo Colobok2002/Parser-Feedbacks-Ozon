@@ -170,23 +170,24 @@ const ansverRiviev = async (review_uuid, text) => {
     });
 
     if (!response.ok) {
-      alert(response.status);
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     const result = await response.json();
-    alert("Ответ отправлен успешно!");
+    
     return true;
 
   } catch (error) {
+    console.log(error)
     return false;
   }
 };
 
 const updateFeedbackStatus = async (feedbackId, status) => {
+  console.log(status)
   const { apiUrl, headerApiKey } = await getSettings();
   try {
-    const response = await axios.post(`${apiUrl}/feedbacks/change-status-feedbacks`, {
+    const response = await axios.post(`${apiUrl}/feedbacks/change-status-feedbacks/`, {
       feedbackId: feedbackId,
       status: status
     }, {
@@ -194,7 +195,6 @@ const updateFeedbackStatus = async (feedbackId, status) => {
         "HeaderApiKey": headerApiKey
       }
     });
-
     if (response.status !== 200) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -219,7 +219,7 @@ const processFeedbacks = async () => {
     const results = await Promise.all(data.map(async (feedback) => {
       const success = await ansverRiviev(feedback.feedback_ID, feedback.ansver);
       const status = success ? "success" : "error";
-      await updateFeedbackStatus(feedback.feedback_ID, status);
+      await updateFeedbackStatus(feedback.id, status);
       return success;
     }));
   } catch (error) {
@@ -227,21 +227,26 @@ const processFeedbacks = async () => {
 };
 
 const startIntervals = async () => {
-  setInterval(async () => {
-    const state = store.getState();
-    const interval_time = state.feedback.interval;
-    const work = state.feedback.work;
-    console.log(work);
-    if (work) {
-      const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
-      store.dispatch(setTimer(newTimer));
-      if (newTimer === 1) {
-        await getFeedback();
-      }
-    } else {
-      store.dispatch(setTimer(interval_time));
+  const state = store.getState();
+  const interval_time = state.feedback.interval;
+  const work = state.feedback.work;
+  console.log("Work status", work);
+  if (work) {
+    const newTimer = state.feedback.timer > 1 ? state.feedback.timer - 1 : interval_time;
+    store.dispatch(setTimer(newTimer));
+    if (newTimer === 1) {
+      await getFeedback();
+      await processFeedbacks()
     }
-  }, 900);
+  } else {
+    store.dispatch(setTimer(interval_time));
+  }
 };
 
-startIntervals();
+chrome.alarms.create('feedbackInterval', { periodInMinutes: 0.01 });
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'feedbackInterval') {
+    startIntervals()
+  }
+});
