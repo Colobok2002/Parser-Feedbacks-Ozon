@@ -1,6 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
-// Define the CounterState interface
 export interface CounterState {
   feedback: number;
   timer: number;
@@ -8,8 +7,7 @@ export interface CounterState {
   work: boolean;
 }
 
-// Define the initial state
-const time = 5
+const time = 10
 
 const initialState: CounterState = {
   feedback: 0,
@@ -18,7 +16,6 @@ const initialState: CounterState = {
   work: false,
 };
 
-// Create a slice for feedback
 const feedbackSlice = createSlice({
   name: "feedback",
   initialState,
@@ -38,6 +35,5 @@ const feedbackSlice = createSlice({
   },
 });
 
-// Export actions and reducer
 export const { setFeedback, setTimer, setInterval, setWork } = feedbackSlice.actions;
 export default feedbackSlice.reducer;
