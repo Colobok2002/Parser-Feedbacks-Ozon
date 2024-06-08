@@ -35,7 +35,7 @@ const getSettings = (): Promise<Settings> => {
         const apiUrl = result.ApiUrl || "";
         const companyId = result.company_id || "";
         const headerApiKey = result.HeaderApiKey || "";
-        const interval = result.interval || 60;  // Интервал по умолчанию 60 секунд
+        const interval = result.interval || 60;
         resolve({
           apiUrl,
           companyId,
@@ -256,18 +256,65 @@ const checkAndProcessFeedbacks = async () => {
   }
 };
 
+const checkAuthorization = async () => {
+  try {
+    const cookies = await getCookies();
+    const { companyId } = await getSettings();
+    const pagination_last_timestamp = null;
+    const pagination_last_uuid = null;
+
+    const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Cookie": cookies,
+      },
+      body: JSON.stringify({
+        "with_counters": false,
+        "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+        "company_type": "seller",
+        "filter": { "interaction_status": ["NOT_VIEWED"] },
+        "company_id": companyId,
+        "pagination_last_timestamp": pagination_last_timestamp,
+        "pagination_last_uuid": pagination_last_uuid
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+  } catch (error) {
+    if (error.message.includes('401')) {
+      chrome.tabs.query({ url: "https://seller.ozon.ru/*" }, (tabs) => {
+        if (tabs.length > 0) {
+          chrome.tabs.reload(tabs[0].id);
+        } else {
+          chrome.tabs.create({ url: "https://seller.ozon.ru/app" });
+        }
+      });
+    } else {
+      console.error('Authorization check failed:', error);
+    }
+  }
+};
+
 chrome.alarms.create("feedbackInterval", { periodInMinutes: 1 / 60 });
+chrome.alarms.create("checkAuthorizationInterval", { periodInMinutes: 60 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "feedbackInterval") {
     checkAndProcessFeedbacks();
+  } else if (alarm.name === "checkAuthorizationInterval") {
+    checkAuthorization();
   }
 });
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({ timer: 60, work: false, interval: 60, feedback: 0 });
 });
-
 
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName === "local" && changes.work) {
