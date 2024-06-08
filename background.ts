@@ -251,7 +251,6 @@ const checkAndProcessFeedbacks = async () => {
       await processFeedbacks();
     }
   } else {
-
     chrome.storage.local.set({ timer: interval });
   }
 };
@@ -287,17 +286,14 @@ const checkAuthorization = async () => {
     const data = await response.json();
 
   } catch (error) {
-    if (error.message.includes('401')) {
-      chrome.tabs.query({ url: "https://seller.ozon.ru/*" }, (tabs) => {
-        if (tabs.length > 0) {
-          chrome.tabs.reload(tabs[0].id);
-        } else {
-          chrome.tabs.create({ url: "https://seller.ozon.ru/app" });
-        }
-      });
-    } else {
-      console.error('Authorization check failed:', error);
-    }
+    chrome.tabs.query({ url: "https://seller.ozon.ru/*" }, (tabs) => {
+      if (tabs.length > 0) {
+        chrome.tabs.reload(tabs[0].id);
+      } else {
+        chrome.tabs.create({ url: "https://seller.ozon.ru/app" });
+      }
+    });
+    console.error('[ - ] Authorization check failed:', error);
   }
 };
 
