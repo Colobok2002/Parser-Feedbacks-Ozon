@@ -19,7 +19,7 @@ const getCookies = (): Promise<string> => {
       if (chrome.runtime.lastError) {
         reject(chrome.runtime.lastError);
       } else {
-        const cookieString = cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; ');
+        const cookieString = cookies.map(cookie => `${encodeURIComponent(cookie.name)}=${encodeURIComponent(cookie.value)}`).join('; ');
         resolve(cookieString);
       }
     });
