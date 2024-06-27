@@ -15,6 +15,7 @@ const Popup = () => {
   const [work, setWork] = useState(false);
   const [timer, setTimer] = useState(0);
   const [feedback, setFeedback] = useState(0);
+  const [questions, setQuestions] = useState(0);
   const [interval, setInterval] = useState(60);  // Добавляем состояние для интервала
   const [intervalError, setIntervalError] = useState("");
 
@@ -25,17 +26,17 @@ const Popup = () => {
       setUrl(tab.url);
     });
 
-    chrome.storage.local.get(["ApiUrl", "company_id", "HeaderApiKey", "work", "timer", "feedback", "interval"], (result) => {
+    chrome.storage.local.get(["ApiUrl", "company_id", "HeaderApiKey", "work", "timer", "feedback", "questions", "interval"], (result) => {
       if (result.ApiUrl) setApiUrl(result.ApiUrl);
       if (result.company_id) setCompanyId(result.company_id);
       if (result.HeaderApiKey) setHeaderApiKey(result.HeaderApiKey);
       if (result.work !== undefined) setWork(result.work);
       if (result.timer !== undefined) setTimer(result.timer);
       if (result.feedback !== undefined) setFeedback(result.feedback);
-      if (result.interval !== undefined) setInterval(result.interval);  // Получаем интервал из хранилища
+      if (result.questions !== undefined) setQuestions(result.questions);
+      if (result.interval !== undefined) setInterval(result.interval);
     });
 
-    // Add listener to storage changes
     const handleStorageChange = (changes, areaName) => {
       if (areaName === "local") {
         if (changes.timer) {
@@ -49,6 +50,9 @@ const Popup = () => {
         }
         if (changes.interval) {
           setInterval(changes.interval.newValue);
+        }
+        if (changes.questions) {
+          setQuestions(changes.questions.newValue);
         }
       }
     };
@@ -189,6 +193,7 @@ const Popup = () => {
                       <>
                         <Text>Следующее обновление через - {formatSecondsToMMSS(timer)}</Text>
                         <Text>Необработано отзывов - {feedback}</Text>
+                        <Text>Необработано вопросов - {questions}</Text>
                       </>
                     )}
                   </div>

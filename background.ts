@@ -135,9 +135,38 @@ const sendItemsBatch = async (reviews) => {
 
   const resolvedData = await Promise.all(data);
 
-  if (data.length > 0) {
+  if (resolvedData.length > 0) {
     try {
       await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: resolvedData }, {
+        headers: {
+          "HeaderApiKey": headerApiKey
+        }
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+};
+
+
+const sendQuestionsBatch = async (questions) => {
+  const { apiUrl, headerApiKey } = await getSettings();
+  
+  const data = questions.map((question: any) => {
+    return {
+      prod_art: question.product.offer_id,
+      prod_name: question.product.title,
+      author_name_to_market: question.author.name,
+      question_ID: question.id,
+      question: question.text,
+      market: "ozon",
+      dateTimeQuestion: question.published_at,
+    };
+  });
+
+  if (data.length > 0) {
+    try {
+      await axios.post(`${apiUrl}/feedbacks/add-question/`, { questions: data }, {
         headers: {
           "HeaderApiKey": headerApiKey
         }
@@ -154,7 +183,6 @@ const getFeedback = async () => {
     const { companyId } = await getSettings();
     let pagination_last_timestamp = null;
     let pagination_last_uuid = null;
-    let allReviews = [];
     let unprocessedReviews = [];
 
     while (true) {
@@ -180,7 +208,6 @@ const getFeedback = async () => {
       }
 
       const data = await response.json();
-      allReviews = [...allReviews, ...data.result];
 
       const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
       unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
@@ -216,7 +243,6 @@ const getFeedback = async () => {
       }
 
       const data = await response.json();
-      allReviews = [...allReviews, ...data.result];
 
       const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
       unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
@@ -236,14 +262,11 @@ const getFeedback = async () => {
   }
 };
 
-
 const getQuestions = async () => {
   try {
     const cookies = await getCookies();
     const { companyId } = await getSettings();
-    let pagination_last_timestamp = null;
-    let pagination_last_uuid = null;
-    let allReviews = [];
+    let pagination_last_id = 0;
     let unprocessedReviews = [];
 
     while (true) {
@@ -258,8 +281,8 @@ const getQuestions = async () => {
           "with_brands": false,
           "with_counters": false,
           "company_type": "seller",
-          "filter": { "status": "ALL" },
-          "pagination_last_id": "0"
+          "filter": { "status": "NEW" },
+          "pagination_last_id": pagination_last_id
         })
       });
 
@@ -268,59 +291,50 @@ const getQuestions = async () => {
       }
 
       const data = await response.json();
-      allReviews = [...allReviews, ...data.result];
 
-      const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
-      unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+      unprocessedReviews = [...unprocessedReviews, ...data.result];
 
-      pagination_last_timestamp = data.pagination_last_timestamp;
-      pagination_last_uuid = data.pagination_last_uuid;
+      pagination_last_id = data.pagination_last_id;
 
-      if (!pagination_last_timestamp || !pagination_last_uuid) {
+      if (!data.has_next) {
+        break;
       }
-      break;
     }
 
-    console.log(unprocessedReviews)
+    while (true) {
+      const response = await fetch("https://seller.ozon.ru/api/v1/question-list", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cookie": cookies,
+        },
+        body: JSON.stringify({
+          "sc_company_id": companyId,
+          "with_brands": false,
+          "with_counters": false,
+          "company_type": "seller",
+          "filter": { "status": "VIEWED" },
+          "pagination_last_id": pagination_last_id
+        })
+      });
 
-    // while (true) {
-    //   const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
-    //     method: "POST",
-    //     headers: {
-    //       "Content-Type": "application/json",
-    //       "Cookie": cookies,
-    //     },
-    //     body: JSON.stringify({
-    //       "with_counters": false,
-    //       "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
-    //       "company_type": "seller",
-    //       "filter": { "interaction_status": ["VIEWED"] },
-    //       "company_id": companyId,
-    //       "pagination_last_timestamp": pagination_last_timestamp,
-    //       "pagination_last_uuid": pagination_last_uuid
-    //     })
-    //   });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    //   if (!response.ok) {
-    //     throw new Error(`HTTP error! status: ${response.status}`);
-    //   }
+      const data = await response.json();
 
-    //   const data = await response.json();
-    //   allReviews = [...allReviews, ...data.result];
+      unprocessedReviews = [...unprocessedReviews, ...data.result];
 
-    //   const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
-    //   unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+      pagination_last_id = data.pagination_last_id;
 
-    //   pagination_last_timestamp = data.pagination_last_timestamp;
-    //   pagination_last_uuid = data.pagination_last_uuid;
+      if (!data.has_next) {
+        break;
+      }
+    }
 
-    //   if (!pagination_last_timestamp || !pagination_last_uuid) {
-    //     break;
-    //   }
-    // }
-
-    // chrome.storage.local.set({ feedback: unprocessedReviews.length });
-    // sendItemsBatch(unprocessedReviews);
+    chrome.storage.local.set({ questions: unprocessedReviews.length });
+    sendQuestionsBatch(unprocessedReviews);
   } catch (error) {
     console.error(error);
   }
@@ -346,7 +360,38 @@ const ansverRiviev = async (review_uuid, text) => {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      return false;
+    }
+
+    return true;
+
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+};
+
+const ansverQuestion = async (question_id, text) => {
+  const { companyId } = await getSettings();
+  const data = {
+    "question_id": question_id,
+    "text": text,
+    "company_type": "seller",
+    "sc_company_id": companyId
+  };
+  try {
+    const cookies = await getCookies();
+    const response = await fetch("https://seller.ozon.ru/api/v1/create-answer", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Cookie": cookies,
+      },
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      return false;
     }
 
     return true;
@@ -362,6 +407,25 @@ const updateFeedbackStatus = async (feedbackId, status) => {
   try {
     const response = await axios.post(`${apiUrl}/feedbacks/change-status-feedbacks/`, {
       feedbackId: feedbackId,
+      status: status
+    }, {
+      headers: {
+        "HeaderApiKey": headerApiKey
+      }
+    });
+    if (response.status !== 200) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+const updateQuestionStatus = async (question_ID, status) => {
+  const { apiUrl, headerApiKey } = await getSettings();
+  try {
+    const response = await axios.post(`${apiUrl}/feedbacks/change-status-questins/`, {
+      question_ID: question_ID,
       status: status
     }, {
       headers: {
@@ -400,6 +464,30 @@ const processFeedbacks = async () => {
   }
 };
 
+const processQuestions = async () => {
+  const { apiUrl, headerApiKey } = await getSettings();
+  try {
+    const response = await axios.get(`${apiUrl}/feedbacks/get-question-to-markets/?market=ozon`, {
+      headers: {
+        "HeaderApiKey": headerApiKey
+      }
+    });
+
+    if (response.status !== 200) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const { data } = response.data;
+    await Promise.all(data.map(async (question: any) => {
+      const success = await ansverQuestion(question.question_ID, question.ansver);
+      const status = success ? "success" : "error";
+      await updateQuestionStatus(question.id, status);
+    }));
+  } catch (error) {
+    console.error(error);
+  }
+};
+
 const checkAndProcessFeedbacks = async () => {
   const { work, timer, interval } = await new Promise<StorageResult>((resolve) => {
     chrome.storage.local.get(["work", "timer", "interval"], (result) => resolve(result as StorageResult));
@@ -411,6 +499,8 @@ const checkAndProcessFeedbacks = async () => {
     if (newTimer === 1) {
       await getFeedback();
       await processFeedbacks();
+      await getQuestions()
+      await processQuestions()
     }
   } else {
     chrome.storage.local.set({ timer: interval });
@@ -445,7 +535,7 @@ const checkAuthorization = async () => {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
+    const _ = await response.json();
 
   } catch (error) {
     chrome.tabs.query({ url: "https://seller.ozon.ru/*" }, (tabs) => {
@@ -471,7 +561,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ timer: 60, work: false, interval: 60, feedback: 0 });
+  chrome.storage.local.set({ timer: 60, work: false, interval: 60, feedback: 0, questions: 0 });
 });
 
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
@@ -479,9 +569,10 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
     const oldValue = changes.work.oldValue;
     const newValue = changes.work.newValue;
     if (oldValue === false && newValue === true) {
-      // await getFeedback();
-      // await processFeedbacks();
-      await getQuestions()
+      await getFeedback();
+      await processFeedbacks();
+      await getQuestions();
+      await processQuestions();
     }
   }
 });
