@@ -1,4 +1,8 @@
+// http://127.0.0.1:8001
+// 27844
+// E63ZQs1WnTPbyXC4C5ULyMdVYG0DKkFHb32vjxyg3TP7nqWckYqQrCFK
 import axios from "axios";
+
 
 interface StorageResult {
   work?: boolean;
@@ -47,25 +51,93 @@ const getSettings = (): Promise<Settings> => {
   });
 };
 
+const convertBlobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+
 const sendItemsBatch = async (reviews) => {
-  const { apiUrl, headerApiKey } = await getSettings();
+  const { apiUrl, headerApiKey, companyId } = await getSettings();
+  const cookies = await getCookies();
   const data = reviews
     .filter(review => review.interaction_status !== "PROCESSED")
-    .map(review => ({
-      prod_art: review.product.offer_id,
-      prod_name: review.product.title,
-      feedback_ID: review.uuid,
-      rating: review.rating,
-      positive: review.text.positive,
-      negative: review.text.negative,
-      comment: review.text.comment,
-      market: "ozon",
-      dateTimeFeedback: review.published_at
-    }));
+    .map(async (review: any) => {
+      let additionalData = {};
+      if (review.photos_count > 0 || review.videos_count > 0) {
+        const response = await fetch("https://seller.ozon.ru/api/v2/review/detail", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Cookie": cookies,
+          },
+          body: JSON.stringify({
+            "company_type": "seller",
+            "company_id": companyId,
+            "review_uuid": review.uuid
+          })
+        });
+
+        const responseData = await response.json();
+        if (responseData.photos) {
+          const photosData = await Promise.all(responseData.photos.map(async (photo: any) => {
+            const photoResponse = await fetch(photo.url);
+            const blob = await photoResponse.blob();
+            const base64Data = await convertBlobToBase64(blob);
+            const fileName = photo.url.split('/').pop();
+            return {
+              data: base64Data,
+              name: fileName
+            };
+          }));
+
+          additionalData["photos"] = photosData;
+        }
+
+        if (responseData.videos) {
+          const videosData = await Promise.all(responseData.videos.map(async (video: any) => {
+            const videoResponse = await fetch(video.url);
+            const blob = await videoResponse.blob();
+            const base64Data = await convertBlobToBase64(blob);
+            const fileName = video.url.split('/').pop();
+            return {
+              data: base64Data,
+              name: fileName
+            };
+          }));
+
+
+          additionalData["videos"] = videosData;
+        }
+
+      }
+
+      return {
+        prod_art: review.product.offer_id,
+        prod_name: review.product.title,
+        feedback_ID: review.uuid,
+        rating: review.rating,
+        positive: review.text.positive,
+        negative: review.text.negative,
+        comment: review.text.comment,
+        market: "ozon",
+        dateTimeFeedback: review.published_at,
+        author_name_to_market: review.author_name,
+        ...additionalData
+      };
+    });
+
+  const resolvedData = await Promise.all(data);
 
   if (data.length > 0) {
     try {
-      await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: data }, {
+      await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: resolvedData }, {
         headers: {
           "HeaderApiKey": headerApiKey
         }
@@ -159,6 +231,96 @@ const getFeedback = async () => {
 
     chrome.storage.local.set({ feedback: unprocessedReviews.length });
     sendItemsBatch(unprocessedReviews);
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+
+const getQuestions = async () => {
+  try {
+    const cookies = await getCookies();
+    const { companyId } = await getSettings();
+    let pagination_last_timestamp = null;
+    let pagination_last_uuid = null;
+    let allReviews = [];
+    let unprocessedReviews = [];
+
+    while (true) {
+      const response = await fetch("https://seller.ozon.ru/api/v1/question-list", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Cookie": cookies,
+        },
+        body: JSON.stringify({
+          "sc_company_id": companyId,
+          "with_brands": false,
+          "with_counters": false,
+          "company_type": "seller",
+          "filter": { "status": "ALL" },
+          "pagination_last_id": "0"
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      allReviews = [...allReviews, ...data.result];
+
+      const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
+      unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+
+      pagination_last_timestamp = data.pagination_last_timestamp;
+      pagination_last_uuid = data.pagination_last_uuid;
+
+      if (!pagination_last_timestamp || !pagination_last_uuid) {
+      }
+      break;
+    }
+
+    console.log(unprocessedReviews)
+
+    // while (true) {
+    //   const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       "Cookie": cookies,
+    //     },
+    //     body: JSON.stringify({
+    //       "with_counters": false,
+    //       "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+    //       "company_type": "seller",
+    //       "filter": { "interaction_status": ["VIEWED"] },
+    //       "company_id": companyId,
+    //       "pagination_last_timestamp": pagination_last_timestamp,
+    //       "pagination_last_uuid": pagination_last_uuid
+    //     })
+    //   });
+
+    //   if (!response.ok) {
+    //     throw new Error(`HTTP error! status: ${response.status}`);
+    //   }
+
+    //   const data = await response.json();
+    //   allReviews = [...allReviews, ...data.result];
+
+    //   const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
+    //   unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+
+    //   pagination_last_timestamp = data.pagination_last_timestamp;
+    //   pagination_last_uuid = data.pagination_last_uuid;
+
+    //   if (!pagination_last_timestamp || !pagination_last_uuid) {
+    //     break;
+    //   }
+    // }
+
+    // chrome.storage.local.set({ feedback: unprocessedReviews.length });
+    // sendItemsBatch(unprocessedReviews);
   } catch (error) {
     console.error(error);
   }
@@ -317,8 +479,9 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
     const oldValue = changes.work.oldValue;
     const newValue = changes.work.newValue;
     if (oldValue === false && newValue === true) {
-      await getFeedback();
-      await processFeedbacks();
+      // await getFeedback();
+      // await processFeedbacks();
+      await getQuestions()
     }
   }
 });
