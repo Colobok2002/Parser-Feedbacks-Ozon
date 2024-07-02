@@ -1,4 +1,5 @@
 // http://127.0.0.1:8001
+// https://data.riche.one
 // 27844
 // E63ZQs1WnTPbyXC4C5ULyMdVYG0DKkFHb32vjxyg3TP7nqWckYqQrCFK
 import axios from "axios";
@@ -76,6 +77,8 @@ const sendItemsBatch = async (reviews) => {
           headers: {
             "Content-Type": "application/json",
             "Cookie": cookies,
+            "Origin": "https://seller.ozon.ru",
+            "X-O3-Company-Id": companyId,
           },
           body: JSON.stringify({
             "company_type": "seller",
@@ -151,7 +154,7 @@ const sendItemsBatch = async (reviews) => {
 
 const sendQuestionsBatch = async (questions) => {
   const { apiUrl, headerApiKey } = await getSettings();
-  
+
   const data = questions.map((question: any) => {
     return {
       prod_art: question.product.offer_id,
@@ -179,11 +182,12 @@ const sendQuestionsBatch = async (questions) => {
 
 const getFeedback = async () => {
   try {
-    const cookies = await getCookies();
+
     const { companyId } = await getSettings();
     let pagination_last_timestamp = null;
     let pagination_last_uuid = null;
     let unprocessedReviews = [];
+    const cookies = await getCookies();
 
     while (true) {
       const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
@@ -191,7 +195,10 @@ const getFeedback = async () => {
         headers: {
           "Content-Type": "application/json",
           "Cookie": cookies,
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
         },
+        credentials: "include",
         body: JSON.stringify({
           "with_counters": false,
           "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
@@ -221,11 +228,14 @@ const getFeedback = async () => {
     }
 
     while (true) {
+
       const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Cookie": cookies,
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
         },
         body: JSON.stringify({
           "with_counters": false,
@@ -275,6 +285,8 @@ const getQuestions = async () => {
         headers: {
           "Content-Type": "application/json",
           "Cookie": cookies,
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
         },
         body: JSON.stringify({
           "sc_company_id": companyId,
@@ -307,6 +319,8 @@ const getQuestions = async () => {
         headers: {
           "Content-Type": "application/json",
           "Cookie": cookies,
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
         },
         body: JSON.stringify({
           "sc_company_id": companyId,
@@ -355,6 +369,8 @@ const ansverRiviev = async (review_uuid, text) => {
       headers: {
         "Content-Type": "application/json",
         "Cookie": cookies,
+        "Origin": "https://seller.ozon.ru",
+        "X-O3-Company-Id": companyId,
       },
       body: JSON.stringify(data)
     });
@@ -386,6 +402,8 @@ const ansverQuestion = async (question_id, text) => {
       headers: {
         "Content-Type": "application/json",
         "Cookie": cookies,
+        "Origin": "https://seller.ozon.ru",
+        "X-O3-Company-Id": companyId,
       },
       body: JSON.stringify(data)
     });
@@ -424,7 +442,7 @@ const updateFeedbackStatus = async (feedbackId, status) => {
 const updateQuestionStatus = async (question_ID, status) => {
   const { apiUrl, headerApiKey } = await getSettings();
   try {
-    const response = await axios.post(`${apiUrl}/feedbacks/change-status-questins/`, {
+    const response = await axios.post(`${apiUrl}/feedbacks/change-status-questins`, {
       question_ID: question_ID,
       status: status
     }, {
@@ -519,6 +537,8 @@ const checkAuthorization = async () => {
       headers: {
         "Content-Type": "application/json",
         "Cookie": cookies,
+        "Origin": "https://seller.ozon.ru",
+        "X-O3-Company-Id": companyId,
       },
       body: JSON.stringify({
         "with_counters": false,

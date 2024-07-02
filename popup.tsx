@@ -240,7 +240,7 @@ const Popup = () => {
               </Form.Item>
             </Form>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.3 }}>
-              <p>version 0.2.1</p>
+              <p>version 0.2.2</p>
             </div>
           </TabPane>
         </Tabs>
