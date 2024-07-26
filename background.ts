@@ -105,12 +105,9 @@ const sendItemsBatch = async (reviews) => {
 
         if (responseData.videos) {
           const videosData = await Promise.all(responseData.videos.map(async (video: any) => {
-            const videoResponse = await fetch(video.url);
-            const blob = await videoResponse.blob();
-            const base64Data = await convertBlobToBase64(blob);
             const fileName = video.url.split('/').pop();
             return {
-              data: base64Data,
+              data: video.url,
               name: fileName
             };
           }));
