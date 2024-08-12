@@ -63,6 +63,24 @@ const convertBlobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+function sendMessageToContentScript(message, callback) {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs.length === 0) {
+      console.error('No active tab found');
+      return;
+    }
+
+    chrome.tabs.sendMessage(tabs[0].id!, message, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('Error:', chrome.runtime.lastError.message);
+        return;
+      }
+      callback(response);
+    });
+  });
+}
+
+
 
 const sendItemsBatch = async (reviews) => {
   const { apiUrl, headerApiKey, companyId } = await getSettings();
@@ -180,90 +198,122 @@ const sendQuestionsBatch = async (questions) => {
 const getFeedback = async () => {
   try {
 
-    const { companyId } = await getSettings();
-    let pagination_last_timestamp = null;
-    let pagination_last_uuid = null;
-    let unprocessedReviews = [];
-    const cookies = await getCookies();
+    // const { companyId } = await getSettings();
+    // let pagination_last_timestamp = null;
+    // let pagination_last_uuid = null;
+    // let unprocessedReviews = [];
+    // const cookies = await getCookies();
 
-    while (true) {
-      const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
-        method: "POST",
+    // while (true) {
+    //   const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       "Cookie": cookies,
+    //       "Origin": "https://seller.ozon.ru",
+    //       "X-O3-Company-Id": companyId,
+    //     },
+    //     credentials: "include",
+    //     body: JSON.stringify({
+    //       "with_counters": false,
+    //       "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+    //       "company_type": "seller",
+    //       "filter": { "interaction_status": ["NOT_VIEWED"] },
+    //       "company_id": companyId,
+    //       "pagination_last_timestamp": pagination_last_timestamp,
+    //       "pagination_last_uuid": pagination_last_uuid
+    //     })
+    //   });
+
+    //   if (!response.ok) {
+    //     throw new Error(`HTTP error! status: ${response.status}`);
+    //   }
+
+    //   const data = await response.json();
+
+    //   const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
+    //   unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+
+    //   pagination_last_timestamp = data.pagination_last_timestamp;
+    //   pagination_last_uuid = data.pagination_last_uuid;
+
+    //   if (!pagination_last_timestamp || !pagination_last_uuid) {
+    //     break;
+    //   }
+    // }
+
+    // while (true) {
+
+    //   const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
+    //     method: "POST",
+    //     headers: {
+    //       "Content-Type": "application/json",
+    //       "Cookie": cookies,
+    //       "Origin": "https://seller.ozon.ru",
+    //       "X-O3-Company-Id": companyId,
+    //     },
+    //     body: JSON.stringify({
+    //       "with_counters": false,
+    //       "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+    //       "company_type": "seller",
+    //       "filter": { "interaction_status": ["VIEWED"] },
+    //       "company_id": companyId,
+    //       "pagination_last_timestamp": pagination_last_timestamp,
+    //       "pagination_last_uuid": pagination_last_uuid
+    //     })
+    //   });
+
+    //   if (!response.ok) {
+    //     throw new Error(`HTTP error! status: ${response.status}`);
+    //   }
+
+    //   const data = await response.json();
+
+    //   const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
+    //   unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
+
+    //   pagination_last_timestamp = data.pagination_last_timestamp;
+    //   pagination_last_uuid = data.pagination_last_uuid;
+
+    //   if (!pagination_last_timestamp || !pagination_last_uuid) {
+    //     break;
+    //   }
+    // }
+
+    // chrome.storage.local.set({ feedback: unprocessedReviews.length });
+    // sendItemsBatch(unprocessedReviews);
+
+    chrome.runtime.sendMessage({
+      action: 'fetchData',
+      url: 'https://seller.ozon.ru/api/site/notice/list',
+      options: {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "Cookie": cookies,
-          "Origin": "https://seller.ozon.ru",
-          "X-O3-Company-Id": companyId,
+          "accept": "application/json, text/plain, */*",
+          "accept-language": "ru",
+          "content-type": "application/json",
+          "priority": "u=1, i",
+          "sec-ch-ua": "\"Not)A;Brand\";v=\"99\", \"Google Chrome\";v=\"127\", \"Chromium\";v=\"127\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\"",
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "x-o3-app-name": "seller-ui",
+          "x-o3-company-id": "27844",
+          "x-o3-language": "ru",
+          "x-o3-page-type": "review"
         },
-        credentials: "include",
-        body: JSON.stringify({
-          "with_counters": false,
-          "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
-          "company_type": "seller",
-          "filter": { "interaction_status": ["NOT_VIEWED"] },
-          "company_id": companyId,
-          "pagination_last_timestamp": pagination_last_timestamp,
-          "pagination_last_uuid": pagination_last_uuid
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        body: JSON.stringify({ company_id: 27844 }),
+        credentials: 'include'
       }
-
-      const data = await response.json();
-
-      const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
-      unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
-
-      pagination_last_timestamp = data.pagination_last_timestamp;
-      pagination_last_uuid = data.pagination_last_uuid;
-
-      if (!pagination_last_timestamp || !pagination_last_uuid) {
-        break;
+    }, (response) => {
+      if (response.success) {
+        console.log('Data fetched successfully:', response.data);
+      } else {
+        console.error('Error fetching data:', response.error);
       }
-    }
-
-    while (true) {
-
-      const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cookie": cookies,
-          "Origin": "https://seller.ozon.ru",
-          "X-O3-Company-Id": companyId,
-        },
-        body: JSON.stringify({
-          "with_counters": false,
-          "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
-          "company_type": "seller",
-          "filter": { "interaction_status": ["VIEWED"] },
-          "company_id": companyId,
-          "pagination_last_timestamp": pagination_last_timestamp,
-          "pagination_last_uuid": pagination_last_uuid
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
-      unprocessedReviews = [...unprocessedReviews, ...newUnprocessed];
-
-      pagination_last_timestamp = data.pagination_last_timestamp;
-      pagination_last_uuid = data.pagination_last_uuid;
-
-      if (!pagination_last_timestamp || !pagination_last_uuid) {
-        break;
-      }
-    }
-
-    chrome.storage.local.set({ feedback: unprocessedReviews.length });
-    sendItemsBatch(unprocessedReviews);
+    });
   } catch (error) {
     console.error(error);
   }
@@ -512,10 +562,10 @@ const checkAndProcessFeedbacks = async () => {
     let newTimer = timer > 1 ? timer - 1 : interval;
     chrome.storage.local.set({ timer: newTimer });
     if (newTimer === 1) {
-      await getFeedback();
-      await processFeedbacks();
-      await getQuestions()
-      await processQuestions()
+      // await getFeedback();
+      // await processFeedbacks();
+      // await getQuestions()
+      // await processQuestions()
     }
   } else {
     chrome.storage.local.set({ timer: interval });
@@ -581,15 +631,73 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({ timer: 60, work: false, interval: 60, feedback: 0, questions: 0 });
 });
 
+chrome.runtime.onMessage.addListener((request, _, sendResponse) => {
+  const handleFetchData = async () => {
+    console.log('Message received in background script:', request);
+
+    if (request.message === 'fetchData') {
+      try {
+        const response = await fetch(request.url, request.options);
+        const data = await response.json();
+        sendResponse({ success: true, data });
+      } catch (error) {
+        sendResponse({ success: false, error: error.message });
+      }
+    }
+  };
+
+  handleFetchData();
+
+  return true;
+});
+
+
+
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName === "local" && changes.work) {
     const oldValue = changes.work.oldValue;
     const newValue = changes.work.newValue;
     if (oldValue === false && newValue === true) {
-      await getFeedback();
-      await processFeedbacks();
-      await getQuestions();
-      await processQuestions();
+      // await getFeedback();
+      // await processFeedbacks();
+      // await getQuestions();
+      // await processQuestions();
+      sendMessageToContentScript({
+        action: 'fetchData',
+        url: 'https://seller.ozon.ru/api/site/notice/list',
+        options: {
+          method: 'POST',
+          headers: {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "ru",
+            "content-type": "application/json",
+            "priority": "u=1, i",
+            "sec-ch-ua": "\"Not)A;Brand\";v=\"99\", \"Google Chrome\";v=\"127\", \"Chromium\";v=\"127\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "x-o3-app-name": "seller-ui",
+            "x-o3-company-id": "27844",
+            "x-o3-language": "ru",
+            "x-o3-page-type": "review"
+          },
+          body: JSON.stringify({ company_id: 27844 }),
+          credentials: 'include'
+        }
+      }, (response) => {
+        console.log(response)
+        if (response.success) {
+          console.log('Data fetched successfully:', response.data);
+        } else {
+          console.error('Error fetching data:', response.error);
+        }
+      });
+
     }
   }
 });
+
+
+
