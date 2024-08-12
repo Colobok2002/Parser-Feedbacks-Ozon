@@ -1,7 +1,7 @@
 {
   "name": "feedbacks-markets",
   "displayName": "Feedbacks markets",
-  "version": "0.2.3",
+  "version": "3.0.0",
   "description": "A basic Plasmo extension.",
   "author": "ilya.bv.2002@bk.ru",
   "scripts": {

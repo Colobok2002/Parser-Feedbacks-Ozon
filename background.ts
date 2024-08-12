@@ -66,20 +66,35 @@ const convertBlobToBase64 = (blob: Blob): Promise<string> => {
 
 function apiToOzon(message): Promise<any> {
   return new Promise((resolve, reject) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs.length === 0) {
-        return reject(new Error('No active tab found'));
-      }
+    chrome.tabs.query({}, (tabs) => {
+      let ozonTab = tabs.find(tab => tab.url && tab.url.includes('seller.ozon.ru'));
 
-      chrome.tabs.sendMessage(tabs[0].id!, message, (response) => {
-        if (chrome.runtime.lastError) {
-          return reject(new Error(chrome.runtime.lastError.message));
-        }
-        resolve(response);
-      });
+      if (ozonTab) {
+        chrome.tabs.sendMessage(ozonTab.id!, message, (response) => {
+          if (chrome.runtime.lastError) {
+            return reject(new Error(chrome.runtime.lastError.message));
+          }
+          resolve(response);
+        });
+      } else {
+        chrome.tabs.create({ url: 'https://seller.ozon.ru' }, (newTab) => {
+          chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+            if (tabId === newTab.id && changeInfo.status === 'complete') {
+              chrome.tabs.onUpdated.removeListener(listener);
+              chrome.tabs.sendMessage(newTab.id!, message, (response) => {
+                if (chrome.runtime.lastError) {
+                  return reject(new Error(chrome.runtime.lastError.message));
+                }
+                resolve(response);
+              });
+            }
+          });
+        });
+      }
     });
   });
 }
+
 
 const sendItemsBatch = async (reviews) => {
   const { apiUrl, headerApiKey, companyId } = await getSettings();
