@@ -2,6 +2,7 @@
 // https://data.riche.one
 // 27844
 // E63ZQs1WnTPbyXC4C5ULyMdVYG0DKkFHb32vjxyg3TP7nqWckYqQrCFK
+
 import axios from "axios";
 
 
@@ -63,7 +64,7 @@ const convertBlobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-function sendMessageToContentScript(message): Promise<any> {
+function apiToOzon(message): Promise<any> {
   return new Promise((resolve, reject) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs.length === 0) {
@@ -80,7 +81,6 @@ function sendMessageToContentScript(message): Promise<any> {
   });
 }
 
-
 const sendItemsBatch = async (reviews) => {
   const { apiUrl, headerApiKey, companyId } = await getSettings();
   const cookies = await getCookies();
@@ -89,22 +89,25 @@ const sendItemsBatch = async (reviews) => {
     .map(async (review: any) => {
       let additionalData = {};
       if (review.photos_count > 0 || review.videos_count > 0) {
-        const response = await fetch("https://seller.ozon.ru/api/v2/review/detail", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Cookie": cookies,
-            "Origin": "https://seller.ozon.ru",
-            "X-O3-Company-Id": companyId,
-          },
-          body: JSON.stringify({
-            "company_type": "seller",
-            "company_id": companyId,
-            "review_uuid": review.uuid
-          })
+        const response = await apiToOzon({
+          action: 'fetchData',
+          url: "https://seller.ozon.ru/api/v2/review/detail",
+          options: {
+            method: 'POST',
+            headers: {
+              "Content-Type": "application/json",
+              "Origin": "https://seller.ozon.ru",
+              "X-O3-Company-Id": companyId,
+            },
+            body: JSON.stringify({
+              "company_type": "seller",
+              "company_id": companyId,
+              "review_uuid": review.uuid
+            })
+          }
         });
 
-        const responseData = await response.json();
+        const responseData = response.data;
         if (responseData.photos) {
           const photosData = await Promise.all(responseData.photos.map(async (photo: any) => {
             const photoResponse = await fetch(photo.url);
@@ -205,7 +208,7 @@ const getFeedback = async () => {
 
   while (true) {
     try {
-      const response = await sendMessageToContentScript({
+      const response = await apiToOzon({
         action: 'fetchData',
         url: 'https://seller.ozon.ru/api/v3/review/list',
         options: {
@@ -227,6 +230,7 @@ const getFeedback = async () => {
           credentials: 'include'
         }
       });
+
       if (response.success) {
         data = response.data;
         const newUnprocessed = data.result.filter(item => item.interaction_status !== 'PROCESSED');
@@ -239,12 +243,12 @@ const getFeedback = async () => {
           break;
         }
       } else {
-        console.error('Error fetching data:', response.error);
+        console.error('Error fetching data feedback:', response.error);
         break;
       }
 
     } catch (error) {
-      console.error('Error:', error.message);
+      console.error('Error feedback:', error.message);
       break;
     }
   };
@@ -255,7 +259,7 @@ const getFeedback = async () => {
 
   while (true) {
     try {
-      const response = await sendMessageToContentScript({
+      const response = await apiToOzon({
         action: 'fetchData',
         url: 'https://seller.ozon.ru/api/v3/review/list',
         options: {
@@ -285,17 +289,17 @@ const getFeedback = async () => {
 
         pagination_last_timestamp = data.pagination_last_timestamp;
         pagination_last_uuid = data.pagination_last_uuid;
-        
+
         if (!pagination_last_timestamp || !pagination_last_uuid) {
           break;
         }
       } else {
-        console.error('Error fetching data:', response.error);
+        console.error('Error fetching data feedback:', response.error);
         break;
       }
 
     } catch (error) {
-      console.error('Error:', error.message);
+      console.error('Error feedback:', error.message);
       break;
     }
   }
@@ -306,85 +310,108 @@ const getFeedback = async () => {
 }
 
 const getQuestions = async () => {
-  try {
-    const cookies = await getCookies();
-    const { companyId } = await getSettings();
-    let pagination_last_id = 0;
-    let unprocessedReviews = [];
 
-    while (true) {
-      const response = await fetch("https://seller.ozon.ru/api/v1/question-list", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cookie": cookies,
-          "Origin": "https://seller.ozon.ru",
-          "X-O3-Company-Id": companyId,
-        },
-        body: JSON.stringify({
-          "sc_company_id": companyId,
-          "with_brands": false,
-          "with_counters": false,
-          "company_type": "seller",
-          "filter": { "status": "NEW" },
-          "pagination_last_id": pagination_last_id
-        })
+  const { companyId } = await getSettings();
+  let pagination_last_id = 0;
+  let unprocessedReviews = [];
+  let data;
+
+  while (true) {
+    try {
+      const response = await apiToOzon({
+        action: 'fetchData',
+        url: 'https://seller.ozon.ru/api/v1/question-list',
+        options: {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/json",
+            "Origin": "https://seller.ozon.ru",
+            "X-O3-Company-Id": companyId,
+          },
+          body: JSON.stringify({
+            "sc_company_id": companyId,
+            "with_brands": false,
+            "with_counters": false,
+            "company_type": "seller",
+            "filter": { "status": "NEW" },
+            "pagination_last_id": pagination_last_id
+          })
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      if (response.success) {
+        data = response.data;
 
-      const data = await response.json();
+        unprocessedReviews = [...unprocessedReviews, ...data.result];
 
-      unprocessedReviews = [...unprocessedReviews, ...data.result];
+        pagination_last_id = data.pagination_last_id;
 
-      pagination_last_id = data.pagination_last_id;
+        if (!data.has_next) {
+          break;
+        }
 
-      if (!data.has_next) {
+      } else {
+        console.error('Error fetching data question:', response.error);
         break;
       }
+
+    } catch (error) {
+      console.error('Error question:', error.message);
+      break;
     }
 
-    while (true) {
-      const response = await fetch("https://seller.ozon.ru/api/v1/question-list", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Cookie": cookies,
-          "Origin": "https://seller.ozon.ru",
-          "X-O3-Company-Id": companyId,
-        },
-        body: JSON.stringify({
-          "sc_company_id": companyId,
-          "with_brands": false,
-          "with_counters": false,
-          "company_type": "seller",
-          "filter": { "status": "VIEWED" },
-          "pagination_last_id": pagination_last_id
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      unprocessedReviews = [...unprocessedReviews, ...data.result];
-
-      pagination_last_id = data.pagination_last_id;
-
-      if (!data.has_next) {
-        break;
-      }
-    }
-
-    chrome.storage.local.set({ questions: unprocessedReviews.length });
-    sendQuestionsBatch(unprocessedReviews);
-  } catch (error) {
-    console.error(error);
   }
+
+  pagination_last_id = 0
+
+  while (true) {
+    try {
+      const response = await apiToOzon({
+        action: 'fetchData',
+        url: 'https://seller.ozon.ru/api/v1/question-list',
+        options: {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/json",
+            "Origin": "https://seller.ozon.ru",
+            "X-O3-Company-Id": companyId,
+          },
+          body: JSON.stringify({
+            "sc_company_id": companyId,
+            "with_brands": false,
+            "with_counters": false,
+            "company_type": "seller",
+            "filter": { "status": "VIEWED" },
+            "pagination_last_id": pagination_last_id
+          })
+        }
+      });
+
+      if (response.success) {
+        data = response.data;
+
+        unprocessedReviews = [...unprocessedReviews, ...data.result];
+
+        pagination_last_id = data.pagination_last_id;
+
+        if (!data.has_next) {
+          break;
+        }
+
+      } else {
+        console.error('Error fetching data question:', response.error);
+        break;
+      }
+
+    } catch (error) {
+      console.error('Error question:', error.message);
+      break;
+    }
+
+  }
+
+  chrome.storage.local.set({ questions: unprocessedReviews.length });
+  sendQuestionsBatch(unprocessedReviews);
 };
 
 const ansverRiviev = async (review_uuid, text) => {
@@ -396,24 +423,24 @@ const ansverRiviev = async (review_uuid, text) => {
     "company_id": companyId
   };
   try {
-    const cookies = await getCookies();
-    const response = await fetch("https://seller.ozon.ru/api/review/comment/create", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cookie": cookies,
-        "Origin": "https://seller.ozon.ru",
-        "X-O3-Company-Id": companyId,
-      },
-      body: JSON.stringify(data)
+    const response = await apiToOzon({
+      action: 'fetchData',
+      url: 'https://seller.ozon.ru/api/review/comment/create',
+      options: {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
+        },
+        body: JSON.stringify(data)
+      }
     });
 
-    if (!response.ok) {
+    if (!response.success) {
       return false;
     }
-
     return true;
-
   } catch (error) {
     console.error(error);
     return false;
@@ -430,18 +457,22 @@ const ansverQuestion = async (question_id, text) => {
   };
   try {
     const cookies = await getCookies();
-    const response = await fetch("https://seller.ozon.ru/api/v1/create-answer", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cookie": cookies,
-        "Origin": "https://seller.ozon.ru",
-        "X-O3-Company-Id": companyId,
-      },
-      body: JSON.stringify(data)
+    const response = await apiToOzon({
+      action: 'fetchData',
+      url: "https://seller.ozon.ru/api/v1/create-answer",
+      options: {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
+        },
+        body: JSON.stringify(data)
+      }
     });
+   
 
-    if (!response.ok) {
+    if (!response.success) {
       return false;
     }
 
@@ -548,10 +579,10 @@ const checkAndProcessFeedbacks = async () => {
     let newTimer = timer > 1 ? timer - 1 : interval;
     chrome.storage.local.set({ timer: newTimer });
     if (newTimer === 1) {
-      // await getFeedback();
-      // await processFeedbacks();
-      // await getQuestions()
-      // await processQuestions()
+      await getFeedback();
+      await processFeedbacks();
+      await getQuestions()
+      await processQuestions()
     }
   } else {
     chrome.storage.local.set({ timer: interval });
@@ -565,30 +596,34 @@ const checkAuthorization = async () => {
     const pagination_last_timestamp = null;
     const pagination_last_uuid = null;
 
-    const response = await fetch("https://seller.ozon.ru/api/v3/review/list", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Cookie": cookies,
-        "Origin": "https://seller.ozon.ru",
-        "X-O3-Company-Id": companyId,
-      },
-      body: JSON.stringify({
-        "with_counters": false,
-        "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
-        "company_type": "seller",
-        "filter": { "interaction_status": ["NOT_VIEWED"] },
-        "company_id": companyId,
-        "pagination_last_timestamp": pagination_last_timestamp,
-        "pagination_last_uuid": pagination_last_uuid
-      })
+    const response = await apiToOzon({
+      action: 'fetchData',
+      url: 'https://seller.ozon.ru/api/v3/review/list',
+      options: {
+        method: 'POST',
+        headers: {
+          "Content-Type": "application/json",
+          "Origin": "https://seller.ozon.ru",
+          "X-O3-Company-Id": companyId,
+        },
+        body: JSON.stringify({
+          "with_counters": false,
+          "sort": { "sort_by": "PUBLISHED_AT", "sort_direction": "DESC" },
+          "company_type": "seller",
+          "filter": { "interaction_status": ["NOT_VIEWED"] },
+          "company_id": companyId,
+          "pagination_last_timestamp": pagination_last_timestamp,
+          "pagination_last_uuid": pagination_last_uuid
+        }),
+        credentials: 'include'
+      }
     });
 
-    if (!response.ok) {
+    if (!response.success) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const _ = await response.json();
+    const _ = await response.data;
 
   } catch (error) {
     chrome.tabs.query({ url: "https://seller.ozon.ru/*" }, (tabs) => {
@@ -617,27 +652,6 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.set({ timer: 60, work: false, interval: 60, feedback: 0, questions: 0 });
 });
 
-chrome.runtime.onMessage.addListener((request, _, sendResponse) => {
-  const handleFetchData = async () => {
-    console.log('Message received in background script:', request);
-
-    if (request.message === 'fetchData') {
-      try {
-        const response = await fetch(request.url, request.options);
-        const data = await response.json();
-        sendResponse({ success: true, data });
-      } catch (error) {
-        sendResponse({ success: false, error: error.message });
-      }
-    }
-  };
-
-  handleFetchData();
-
-  return true;
-});
-
-
 
 chrome.storage.onChanged.addListener(async (changes, areaName) => {
   if (areaName === "local" && changes.work) {
@@ -645,9 +659,9 @@ chrome.storage.onChanged.addListener(async (changes, areaName) => {
     const newValue = changes.work.newValue;
     if (oldValue === false && newValue === true) {
       await getFeedback();
-      // await processFeedbacks();
-      // await getQuestions();
-      // await processQuestions();
+      await processFeedbacks();
+      await getQuestions();
+      await processQuestions();
 
 
     }
