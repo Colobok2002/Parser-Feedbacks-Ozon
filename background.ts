@@ -170,17 +170,17 @@ const sendItemsBatch = async (reviews) => {
 
   const resolvedData = await Promise.all(data);
 
-  if (resolvedData.length > 0) {
-    try {
-      await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: resolvedData }, {
-        headers: {
-          "HeaderApiKey": headerApiKey
-        }
-      });
-    } catch (err) {
-      console.error(err);
-    }
+
+  try {
+    await axios.post(`${apiUrl}/feedbacks/add-feedbacks/`, { feedbacks: resolvedData }, {
+      headers: {
+        "HeaderApiKey": headerApiKey
+      }
+    });
+  } catch (err) {
+    console.error(err);
   }
+
 };
 
 
@@ -199,17 +199,17 @@ const sendQuestionsBatch = async (questions) => {
     };
   });
 
-  if (data.length > 0) {
-    try {
-      await axios.post(`${apiUrl}/feedbacks/add-question/`, { questions: data }, {
-        headers: {
-          "HeaderApiKey": headerApiKey
-        }
-      });
-    } catch (err) {
-      console.error(err);
-    }
+
+  try {
+    await axios.post(`${apiUrl}/feedbacks/add-question/`, { questions: data }, {
+      headers: {
+        "HeaderApiKey": headerApiKey
+      }
+    });
+  } catch (err) {
+    console.error(err);
   }
+
 };
 
 const getFeedback = async () => {
@@ -485,7 +485,7 @@ const ansverQuestion = async (question_id, text) => {
         body: JSON.stringify(data)
       }
     });
-   
+
 
     if (!response.success) {
       return false;
